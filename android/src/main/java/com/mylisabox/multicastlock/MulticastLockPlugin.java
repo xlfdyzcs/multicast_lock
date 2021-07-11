@@ -1,4 +1,4 @@
-package cz.analogic.multicastlock;
+package com.mylisabox.multicastlock;
 
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
