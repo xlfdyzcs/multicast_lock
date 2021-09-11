@@ -1,3 +1,7 @@
+# 1.0.1
+
+- move to embedding v2
+
 # 1.0.0+1
 
 - fix compileSdkVersion to 30

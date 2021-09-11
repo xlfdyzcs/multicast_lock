@@ -1,6 +1,6 @@
 name: android_multicast_lock
 description: Flutter plugin to manage multicast lock on Android
-version: 1.0.0+1
+version: 1.0.1
 homepage: https://github.com/mylisabox/multicast_lock
 
 environment:
