@@ -19,15 +19,7 @@ public class MulticastLockPlugin implements FlutterPlugin, MethodCallHandler {
   private WifiManager.MulticastLock multicastLock;
   private Context appContext;
 
-  /** Plugin registration. */
-  public static void registerWith(Registrar registrar) {
-    final MethodChannel channel = new MethodChannel(registrar.messenger(), "multicast_lock");
-    channel.setMethodCallHandler(new MulticastLockPlugin(registrar.context()));
-  }
-
-  private MulticastLockPlugin(Context context) {
-    this.appContext = context;
-  }
+  public MulticastLockPlugin() {}
 
   public void onMethodCall(MethodCall call, @NonNull Result result) {
     switch (call.method) {
@@ -96,6 +88,8 @@ public class MulticastLockPlugin implements FlutterPlugin, MethodCallHandler {
   @Override
   public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
     appContext = binding.getApplicationContext();
+    final MethodChannel channel = new MethodChannel(binding.getBinaryMessenger(), "multicast_lock");
+    channel.setMethodCallHandler(this);
   }
 
   /**

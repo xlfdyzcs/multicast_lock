@@ -50,6 +50,7 @@ class _HomePageState extends State<HomePage> {
               ElevatedButton(
                 onPressed: () async {
                   final isHeld = await MulticastLock().isHeld();
+                  print(isHeld);
                 },
                 child: Text("Test if held"),
               )
