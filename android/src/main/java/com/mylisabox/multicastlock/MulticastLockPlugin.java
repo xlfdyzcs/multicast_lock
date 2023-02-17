@@ -1,9 +1,26 @@
 package com.mylisabox.multicastlock;
 
+import com.mylisabox.multicastlock.MulticastMessageKt;
 import android.content.Context;
+import android.net.ConnectivityManager;
 import android.net.wifi.WifiManager;
 
 import androidx.annotation.NonNull;
+
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.net.StandardProtocolFamily;
+import java.net.StandardSocketOptions;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.MembershipKey;
+import java.nio.channels.MulticastChannel;
+import java.nio.channels.WritableByteChannel;
 
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
@@ -18,16 +35,26 @@ public class MulticastLockPlugin implements FlutterPlugin, MethodCallHandler {
   private static final String CHANNEL = "multicast_lock";
   private WifiManager.MulticastLock multicastLock;
   private Context appContext;
+  private FlutterPluginBinding binding;
+  // 定义接收网络数据的字节数组
+  byte[] inBuff = new byte[4096];
+  // 以指定字节数组创建准备接受数据的DatagramPacket对象
+  private DatagramPacket inPacket = new DatagramPacket(inBuff, inBuff.length);
 
   public MulticastLockPlugin() {}
 
   public void onMethodCall(MethodCall call, @NonNull Result result) {
     switch (call.method) {
       case "acquire":
-        if (acquire()) {
-          result.success(null);
-        } else {
-          result.error("UNAVAILABLE", "WifiManager not present", null);
+        try {
+//          new MulticastMessageKt(binding);
+          if (acquire()) {
+            result.success(null);
+          } else {
+            result.error("UNAVAILABLE", "WifiManager not present", null);
+          }
+        } catch (IOException e) {
+          e.printStackTrace();
         }
         break;
       case "release":
@@ -40,15 +67,19 @@ public class MulticastLockPlugin implements FlutterPlugin, MethodCallHandler {
       case "isHeld":
         result.success(isHeld());
         break;
+      case "multicastOnTethering":
+        new MulticastMessageKt(binding);
       default:
         result.notImplemented();
         break;
     }
   }
 
-  private boolean acquire() throws NullPointerException
-  {
+  private boolean acquire() throws NullPointerException, IOException {
     WifiManager wifi = (WifiManager) appContext.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+
+//    MembershipKey key = dc.join(group, ni);
+//    dc.socket().receive();
     if(wifi == null) {
       return false;
     }
@@ -87,6 +118,7 @@ public class MulticastLockPlugin implements FlutterPlugin, MethodCallHandler {
    */
   @Override
   public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
+    this.binding = binding;
     appContext = binding.getApplicationContext();
     final MethodChannel channel = new MethodChannel(binding.getBinaryMessenger(), "multicast_lock");
     channel.setMethodCallHandler(this);

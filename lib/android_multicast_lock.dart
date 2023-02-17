@@ -11,6 +11,8 @@ import 'package:flutter/services.dart';
 class MulticastLock {
 
   static const MethodChannel _channel = const MethodChannel('multicast_lock');
+  static const BasicMessageChannel messageChannel = BasicMessageChannel('moying_mobilelib_multicast_message_channel', StandardMessageCodec());
+
   static MulticastLock? _instance;
 
   factory MulticastLock() {
@@ -43,6 +45,12 @@ class MulticastLock {
       result = await _channel.invokeMethod('isHeld');
     }
     return result ?? false;
+  }
+
+  Future<void> multicastOnTethering() async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await _channel.invokeMethod('multicastOnTethering');
+    }
   }
 }
 
