@@ -34,18 +34,20 @@ class MulticastMessageKt(flutterPluginBinding: FlutterPlugin.FlutterPluginBindin
     fun startListening(networkInterfaceName: String?, inetSocketAddress: InetSocketAddress?) {
         val interfaceName = networkInterfaceName?: "rndis0"
 //        val interfaceName = "wlan0"
+        val useTethering = interfaceName.startsWith("rndis")
         val ni = NetworkInterface.getByName(interfaceName)
 //        val re = ni.supportsMulticast()
         val interfaceIp: String? = getIpAddressString(interfaceName)
         if (interfaceIp != null && interfaceIp.isNotEmpty()) {
-            val group = InetSocketAddress(interfaceIp, inetSocketAddress?.port?: 7873)
+            val group = inetSocketAddress?: InetSocketAddress("224.77.82.73", 7873)
+            val groupTethering = InetSocketAddress(interfaceIp, 7873)
             val socketChannel = DatagramChannel.open(StandardProtocolFamily.INET)
                 .setOption(StandardSocketOptions.SO_REUSEADDR, true)
                 .setOption(StandardSocketOptions.IP_MULTICAST_LOOP, false)
+                .bind((if (useTethering) groupTethering else group))
                 .setOption(StandardSocketOptions.IP_MULTICAST_IF, ni)
-                .bind(group)
             datagramChannel = socketChannel
-            socketChannel.join((inetSocketAddress?: InetSocketAddress("224.77.82.73", 7873)).address, ni)
+            socketChannel.join(group.address, ni)
             coroutineScope = CoroutineScope(Dispatchers.IO)
             coroutineScope?.launch {
                 try {

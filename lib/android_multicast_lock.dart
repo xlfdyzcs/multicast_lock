@@ -65,5 +65,11 @@ class MulticastLock {
       });
     }
   }
+
+  Future closeMulticastListening() async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await _channel.invokeMethod('closeMulticastListening');
+    }
+  }
 }
 
