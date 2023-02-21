@@ -1,20 +1,21 @@
 package com.mylisabox.multicastlock
 
-import android.annotation.SuppressLint
-import android.os.AsyncTask
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.BasicMessageChannel
 import io.flutter.plugin.common.StandardMessageCodec
+import kotlinx.coroutines.*
 import java.io.IOException
 import java.net.*
 import java.nio.channels.DatagramChannel
+import java.nio.charset.Charset
 
-class MulticastMessageKt(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) : BasicMessageChannel.MessageHandler<Any> {
+class MulticastMessageKt(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding, networkInterfaceName: String?, inetSocketAddress: InetSocketAddress?) : BasicMessageChannel.MessageHandler<Any> {
     private var channel: BasicMessageChannel<Any> =
             BasicMessageChannel(flutterPluginBinding.binaryMessenger, "moying_mobilelib_multicast_message_channel",
                     StandardMessageCodec())
 
-    private var datagramChannel: DatagramChannel
+    private var datagramChannel: DatagramChannel? = null
+    private var coroutineScope: CoroutineScope? = null
     // 定义接收网络数据的字节数组
     var inBuff = ByteArray(4096)
 
@@ -23,73 +24,87 @@ class MulticastMessageKt(flutterPluginBinding: FlutterPlugin.FlutterPluginBindin
 
     init {
         channel.setMessageHandler(this)
-        val ni = NetworkInterface.getByName("rndis0")
-        val re = ni.supportsMulticast()
-        this.channel.send("NetworkInterface-rndis0 $re")
-        this.channel.send(ni.toString())
-//        this.channel.send(ni.inetAddresses.toList().joinToString("\n") { inetAddress -> inetAddress.hostName })
-//        this.channel.send(ni.subInterfaces.toList().joinToString("\n") { inetAddress -> inetAddress.name })
-        val group = InetSocketAddress("192.168.178.119", 7873)
-        val channel = DatagramChannel.open(StandardProtocolFamily.INET)
-                .setOption(StandardSocketOptions.SO_REUSEADDR, true)
-                .setOption(StandardSocketOptions.IP_MULTICAST_IF, ni)
-                .bind(group)
-        datagramChannel = channel;
-//                .setOption(StandardSocketOptions.IP_MULTICAST_IF, ni)
-        val key = channel.join(InetSocketAddress("224.77.82.73", 7873).address, ni)
-        this.channel.send("joined group")
-//    InetAddress group = InetAddress("224.77.82.73");
-//    channel.configureBlocking(true);
-//    channel.connect();
-        // Android 4.0 之后不能在主线程中请求HTTP请求
-        //    InetAddress group = InetAddress("224.77.82.73");
-//    channel.configureBlocking(true);
-//    channel.connect();
-        // Android 4.0 之后不能在主线程中请求HTTP请求
-        AsyncTaskUdp().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR)
-//        Thread {
-//            try {
-//                this.channel.send("start receive")
-//                while (true) {
-//                    channel.socket().receive(inPacket)
-//                    this.channel.send(inBuff)
-//                    println("聊天信息：" + String(inBuff, 0, inPacket.getLength()))
-//                }
-//            } catch (e: IOException) {
-//                this.channel.send("error: ${e.message}")
-//                e.printStackTrace()
-//            }
-//        }.start()
+        startListening(networkInterfaceName, inetSocketAddress)
     }
 
     override fun onMessage(message: Any?, reply: BasicMessageChannel.Reply<Any>) {
         TODO("Not yet implemented")
     }
 
-    @SuppressLint("StaticFieldLeak")
-    inner class AsyncTaskUdp : AsyncTask<Int, String, String>(){
-        override fun doInBackground(vararg p0: Int?): String? {
-            while (true){
-                Thread.sleep(10)
+    fun startListening(networkInterfaceName: String?, inetSocketAddress: InetSocketAddress?) {
+        val interfaceName = networkInterfaceName?: "rndis0"
+//        val interfaceName = "wlan0"
+        val ni = NetworkInterface.getByName(interfaceName)
+//        val re = ni.supportsMulticast()
+        val interfaceIp: String? = getIpAddressString(interfaceName)
+        if (interfaceIp != null && interfaceIp.isNotEmpty()) {
+            val group = InetSocketAddress(interfaceIp, inetSocketAddress?.port?: 7873)
+            val socketChannel = DatagramChannel.open(StandardProtocolFamily.INET)
+                .setOption(StandardSocketOptions.SO_REUSEADDR, true)
+                .setOption(StandardSocketOptions.IP_MULTICAST_LOOP, false)
+                .setOption(StandardSocketOptions.IP_MULTICAST_IF, ni)
+                .bind(group)
+            datagramChannel = socketChannel
+            socketChannel.join((inetSocketAddress?: InetSocketAddress("224.77.82.73", 7873)).address, ni)
+            coroutineScope = CoroutineScope(Dispatchers.IO)
+            coroutineScope?.launch {
                 try {
-                    publishProgress("start receive")
                     while (true) {
-                        datagramChannel.socket().receive(inPacket)
-//                        channel.send(inBuff)
-                        publishProgress(String(inBuff, 0, inPacket.getLength()))
-                        println("信息：" + String(inBuff, 0, inPacket.getLength()))
+                        socketChannel.socket().receive(inPacket)
+                        withContext(Dispatchers.Main) {
+//                            val b_utf8 = "你好".toByteArray(charset("UTF-8"))
+                            channel.send(String(inPacket.data, inPacket.offset, inPacket.length, charset("UTF-8")))
+//                            channel.send(String(b_utf8, 0, b_utf8.size, charset("UTF-8")))
+//                            val list = inPacket.data.asList().subList(0, inPacket.length)
+//                            channel.send(b_utf8)
+//                            println("聊天信息：" + String(inPacket.data, inPacket.offset, inPacket.length, charset("UTF-8")))
+//                            println("聊天信息：" + String(b_utf8, 0, b_utf8.size, charset("UTF-8")))
+                            inPacket.length = 4096
+                        }
+//                        println("聊天信息：" + String(inBuff, 0, inPacket.getLength()))
                     }
                 } catch (e: IOException) {
-                    publishProgress("error: ${e.message}")
+                    withContext(Dispatchers.Main) {
+                        channel.send("error: ${e.message}")
+                    }
                     e.printStackTrace()
                 }
             }
+        } else {
+            channel.send("error: 未获取到网口 $interfaceName 的ip")
         }
+    }
 
-        override fun onProgressUpdate(vararg values: String?) {
-            super.onProgressUpdate(*values)
-            channel.send(values.toString())
+    fun stopCoroutineScope() {
+        coroutineScope?.cancel()
+    }
+
+    fun stopDatagramChannel() {
+        datagramChannel?.socket()
+    }
+
+    private fun getIpAddressString(interfaceName: String?): String? {
+        try {
+            val enNetI = NetworkInterface.getNetworkInterfaces()
+            while (enNetI.hasMoreElements()) {
+                val netI = enNetI.nextElement()
+                if (interfaceName != null) {
+                    if (!netI.name.equals(interfaceName, ignoreCase = true)) {
+                        continue
+                    }
+                }
+                val enumIpAddr = netI.inetAddresses
+                while (enumIpAddr.hasMoreElements()) {
+                    val inetAddress = enumIpAddr.nextElement()
+                    if (inetAddress is Inet4Address && !inetAddress.isLoopbackAddress()) {
+                        return inetAddress.getHostAddress()
+                    }
+                }
+            }
+        } catch (e: SocketException) {
+            e.printStackTrace()
         }
+        return ""
     }
 
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -10,7 +11,7 @@ import 'package:flutter/services.dart';
 /// battery drain and should be disabled when not needed.
 class MulticastLock {
 
-  static const MethodChannel _channel = const MethodChannel('multicast_lock');
+  static const MethodChannel _channel = MethodChannel('multicast_lock');
   static const BasicMessageChannel messageChannel = BasicMessageChannel('moying_mobilelib_multicast_message_channel', StandardMessageCodec());
 
   static MulticastLock? _instance;
@@ -47,9 +48,21 @@ class MulticastLock {
     return result ?? false;
   }
 
-  Future<void> multicastOnTethering() async {
+  /// 指定网口监听组播数据-默认为 tethering 网口 "rndis0"
+  ///
+  /// 通过指定[networkInterfaceName]来指定网口，比如在使用usb网络共享时，网口名一般都会是"rndis0"
+  /// 当[networkInterfaceName]为空时，默认使用"rndis0"网口接收数据
+  /// TODO: 通过添加参数[allNetworkInterface]控制是否所有网卡都加入组播
+  /// [hostname]是组播地址，224.0.1.0 到 238.255.255.255，详细介绍可看 https://winddoing.github.io/post/18736.html
+  /// [port]是接收组播数据的端口，通过指定端口来过滤其他端口的数据。
+  /// 一个组播地址上允许有多个端口，IP层会收到组内所有端口的数据，经由UDP层对端口进行处理，非UDP层指定的端口报会被丢弃
+  Future<void> listenMulticastOnTethering({String? networkInterfaceName, String? hostname, int? port}) async {
     if (defaultTargetPlatform == TargetPlatform.android) {
-      await _channel.invokeMethod('multicastOnTethering');
+      await _channel.invokeMethod('listenMulticastOnTethering', {
+        'networkInterfaceName': networkInterfaceName,
+        'hostname': hostname,
+        'port': port,
+      });
     }
   }
 }

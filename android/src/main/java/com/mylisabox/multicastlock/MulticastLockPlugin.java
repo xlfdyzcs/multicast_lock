@@ -36,10 +36,7 @@ public class MulticastLockPlugin implements FlutterPlugin, MethodCallHandler {
   private WifiManager.MulticastLock multicastLock;
   private Context appContext;
   private FlutterPluginBinding binding;
-  // 定义接收网络数据的字节数组
-  byte[] inBuff = new byte[4096];
-  // 以指定字节数组创建准备接受数据的DatagramPacket对象
-  private DatagramPacket inPacket = new DatagramPacket(inBuff, inBuff.length);
+  private MulticastMessageKt multicastMessageKt;
 
   public MulticastLockPlugin() {}
 
@@ -67,8 +64,27 @@ public class MulticastLockPlugin implements FlutterPlugin, MethodCallHandler {
       case "isHeld":
         result.success(isHeld());
         break;
-      case "multicastOnTethering":
-        new MulticastMessageKt(binding);
+      case "listenMulticastOnTethering":
+        String hostname = call.argument("hostname");
+        Integer port = call.argument("port");
+        InetSocketAddress socketAddress = null;
+        if (hostname != null && port != null) {
+          socketAddress = new InetSocketAddress(hostname, port);
+        }
+        if (multicastMessageKt == null) {
+          multicastMessageKt = new MulticastMessageKt(binding, call.<String>argument("networkInterfaceName"), socketAddress);
+        } else {
+          multicastMessageKt.startListening(call.<String>argument("networkInterfaceName"), socketAddress);
+        }
+        result.success(null);
+        break;
+      case "closeMulticastListening":
+        if (multicastMessageKt != null) {
+          multicastMessageKt.stopDatagramChannel();
+          multicastMessageKt.stopCoroutineScope();
+          result.success(true);
+        }
+        break;
       default:
         result.notImplemented();
         break;

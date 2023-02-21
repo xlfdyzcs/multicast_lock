@@ -20,6 +20,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
 
+  List<String?> tempPrintStr = [];
+
   @override
   void initState() {
     MulticastLock().acquire();
@@ -52,8 +54,27 @@ class _HomePageState extends State<HomePage> {
                   final isHeld = await MulticastLock().isHeld();
                   print(isHeld);
                 },
-                child: Text("Test if held"),
-              )
+                child: Text("Test multicastLock if held"),
+              ),
+              ElevatedButton(
+                key: Key('openMulticast'),
+                onPressed: () async {
+                  await MulticastLock().listenMulticastOnTethering();
+                  MulticastLock.messageChannel.setMessageHandler((message) async {
+                    debugPrint(message.toString());
+                    tempPrintStr.add(message);
+                    setState(() {
+
+                    });
+                  });
+                },
+                child: Text("Test multicast on usb tethering"),
+              ),
+              Expanded(child: SingleChildScrollView(
+                child: Column(
+                  children: tempPrintStr.map((e) => Text(e ?? '')).toList(),
+                ),
+              ))
             ],
           ),
         ),
