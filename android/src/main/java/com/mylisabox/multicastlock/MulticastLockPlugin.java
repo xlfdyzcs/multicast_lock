@@ -85,6 +85,17 @@ public class MulticastLockPlugin implements FlutterPlugin, MethodCallHandler {
           result.success(true);
         }
         break;
+      case "sniffUsbTetheringSubnetworkIp":
+        String usbTetheringIp = call.argument("usbTetheringIp");
+        if (usbTetheringIp != null) {
+          MulticastMessageKt.Companion.getUsbTetheringSubnetwork(usbTetheringIp, result);
+        } else {
+          result.error("", "usbTetheringIp不能为null", null);
+        }
+        break;
+      case "closeSniff":
+        MulticastMessageKt.Companion.stopShip();
+        break;
       default:
         result.notImplemented();
         break;

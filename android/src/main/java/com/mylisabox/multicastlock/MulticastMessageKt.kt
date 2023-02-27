@@ -2,12 +2,15 @@ package com.mylisabox.multicastlock
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.BasicMessageChannel
+import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.StandardMessageCodec
 import kotlinx.coroutines.*
 import java.io.IOException
 import java.net.*
 import java.nio.channels.DatagramChannel
-import java.nio.charset.Charset
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 class MulticastMessageKt(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding, networkInterfaceName: String?, inetSocketAddress: InetSocketAddress?) : BasicMessageChannel.MessageHandler<Any> {
     private var channel: BasicMessageChannel<Any> =
@@ -82,7 +85,7 @@ class MulticastMessageKt(flutterPluginBinding: FlutterPlugin.FlutterPluginBindin
     }
 
     fun stopDatagramChannel() {
-        datagramChannel?.socket()
+        datagramChannel?.close()
     }
 
     private fun getIpAddressString(interfaceName: String?): String? {
@@ -107,6 +110,82 @@ class MulticastMessageKt(flutterPluginBinding: FlutterPlugin.FlutterPluginBindin
             e.printStackTrace()
         }
         return ""
+    }
+
+    companion object {
+        private var coroutineScope: CoroutineScope? = null
+        private var threadPool: ExecutorService? = null
+        fun getUsbTetheringSubnetwork(usbTetheringIp: String, result: Result) {
+            val parts = usbTetheringIp.split(".")
+            val newIp = parts.dropLast(1).plus("").joinToString(".")
+            var subnetworkIp: String? = null
+            coroutineScope = CoroutineScope(Dispatchers.IO)
+            coroutineScope?.launch {
+                try {
+                    threadPool = Executors.newFixedThreadPool(10)
+                    var future: Future<*>? = null
+                    for (i in 0..255) {
+                        future = threadPool?.submit {
+                            try {
+                                val address = "$newIp$i"
+                    //           val inetAddressIp = inetAddressIsReachable(newIp, usbTetheringIp, i)
+                                if (!usbTetheringIp.equals(address, ignoreCase = true)) {
+                                    val inetAddress = InetAddress.getByName(address)
+                                        println("ping address $address")
+                                    if (inetAddress.isReachable(1000)) {
+                                        subnetworkIp = inetAddress.hostAddress
+                                        CoroutineScope(Dispatchers.Main).launch {
+                                            result.success(subnetworkIp)
+                                        }
+                                        future?.cancel(true)
+                                        threadPool?.shutdownNow()
+                                        coroutineScope?.cancel()
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                                threadPool?.shutdownNow()
+                    //                                result.error("", e.message, null)
+                                this.cancel()
+                            }
+                        }
+                    }
+
+                } catch (e: IOException) {
+                    withContext(Dispatchers.Main) {
+                        result.error("", e.message, null)
+                    }
+                    this.cancel()
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        fun stopShip() {
+            threadPool?.shutdownNow()
+            coroutineScope?.cancel()
+        }
+
+        private fun inetAddressIsReachable(newIp: String?, usbTetheringIp: String?, i: Int): String? {
+            var subnetworkIp: String? = null
+            val address = "$newIp$i"
+            try {
+                if (!usbTetheringIp.equals(address, ignoreCase = true)) {
+                    val inetAddress = InetAddress.getByName(address)
+//                    println("ping address $address")
+                    if (inetAddress.isReachable(1000)) {
+//                        println("The first available address is $address")
+                        subnetworkIp = inetAddress.hostAddress
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                throw Exception(e.message)
+//                result.error("", e.message, null)
+            }
+            return subnetworkIp
+        }
+
     }
 
 }

@@ -71,5 +71,25 @@ class MulticastLock {
       await _channel.invokeMethod('closeMulticastListening');
     }
   }
+
+  /// 嗅探 UsbTethering 模式下首个子网络的IP
+  ///
+  /// 利用 InetAddress.isReachable 查看主机是否可 ping 通。
+  /// 注意！！！只有在子网络主机防火墙允许ICMPv4回显请求时此方法才会有效，
+  /// 否则即使 ping 到正确的子网络 ip 也只会返回null
+  Future<String?> sniffUsbTetheringSubnetworkIp(String usbTetheringIp) async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return await _channel.invokeMethod('sniffUsbTetheringSubnetworkIp', {
+        'usbTetheringIp': usbTetheringIp
+      });
+    }
+    return null;
+  }
+
+  Future closeSniff() async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await _channel.invokeMethod('closeSniff');
+    }
+  }
 }
 
