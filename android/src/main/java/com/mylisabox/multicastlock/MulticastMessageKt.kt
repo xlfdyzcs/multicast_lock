@@ -114,13 +114,15 @@ class MulticastMessageKt(flutterPluginBinding: FlutterPlugin.FlutterPluginBindin
 
     companion object {
         private var coroutineScope: CoroutineScope? = null
+        private var mainJob: Job? = null
+        private var futureDoneJob: Job? = null
         private var threadPool: ExecutorService? = null
         fun getUsbTetheringSubnetwork(usbTetheringIp: String, result: Result) {
             val parts = usbTetheringIp.split(".")
             val newIp = parts.dropLast(1).plus("").joinToString(".")
             var subnetworkIp: String? = null
             coroutineScope = CoroutineScope(Dispatchers.IO)
-            coroutineScope?.launch {
+            mainJob = coroutineScope?.launch {
                 try {
                     threadPool = Executors.newFixedThreadPool(10)
                     var future: Future<*>? = null
@@ -136,10 +138,10 @@ class MulticastMessageKt(flutterPluginBinding: FlutterPlugin.FlutterPluginBindin
                                         subnetworkIp = inetAddress.hostAddress
                                         CoroutineScope(Dispatchers.Main).launch {
                                             result.success(subnetworkIp)
+                                            this.cancel()
                                         }
                                         future?.cancel(true)
-                                        threadPool?.shutdownNow()
-                                        coroutineScope?.cancel()
+                                        stopShip()
                                     }
                                 }
                             } catch (e: Exception) {
@@ -147,6 +149,21 @@ class MulticastMessageKt(flutterPluginBinding: FlutterPlugin.FlutterPluginBindin
                                 threadPool?.shutdownNow()
                     //                                result.error("", e.message, null)
                                 this.cancel()
+                            }
+                        }
+                    }
+
+                    futureDoneJob = this.launch {
+                        while (future?.isDone == false && isActive) {
+                            if (future.isDone) {
+                                CoroutineScope(Dispatchers.Main).launch {
+                                    result.success(subnetworkIp)
+                                    this.cancel()
+                                }
+                                future.cancel(true)
+                                this.cancel()
+                                threadPool?.shutdownNow()
+                                coroutineScope?.cancel()
                             }
                         }
                     }
@@ -163,6 +180,9 @@ class MulticastMessageKt(flutterPluginBinding: FlutterPlugin.FlutterPluginBindin
 
         fun stopShip() {
             threadPool?.shutdownNow()
+            mainJob?.cancel()
+            mainJob?.cancelChildren()
+            futureDoneJob?.cancel()
             coroutineScope?.cancel()
         }
 

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -17,9 +16,7 @@ class MulticastLock {
   static MulticastLock? _instance;
 
   factory MulticastLock() {
-    if (_instance == null) {
-      _instance = MulticastLock.private();
-    }
+    _instance ??= MulticastLock.private();
     return _instance!;
   }
 
