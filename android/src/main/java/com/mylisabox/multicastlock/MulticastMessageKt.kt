@@ -137,7 +137,11 @@ class MulticastMessageKt(flutterPluginBinding: FlutterPlugin.FlutterPluginBindin
                                     if (inetAddress.isReachable(1000)) {
                                         subnetworkIp = inetAddress.hostAddress
                                         CoroutineScope(Dispatchers.Main).launch {
-                                            result.success(subnetworkIp)
+                                            try {
+                                                result.success(subnetworkIp)
+                                            } catch (e: Exception) {
+
+                                            }
                                             this.cancel()
                                         }
                                         future?.cancel(true)
@@ -157,7 +161,11 @@ class MulticastMessageKt(flutterPluginBinding: FlutterPlugin.FlutterPluginBindin
                         while (future?.isDone == false && isActive) {
                             if (future.isDone) {
                                 CoroutineScope(Dispatchers.Main).launch {
-                                    result.success(subnetworkIp)
+                                    try {
+                                        result.success(subnetworkIp)
+                                    } catch (e: Exception) {
+
+                                    }
                                     this.cancel()
                                 }
                                 future.cancel(true)
